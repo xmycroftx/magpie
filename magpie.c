@@ -68,11 +68,14 @@ static inline void square_am_signal(float time, float frequency) {
     }
 }
 static inline void showhelp(char *argv[]){
-            fprintf(stderr, "usage: %s [-m|a] [-l loops] -f fname\n",argv[0]);
-            fprintf(stderr, "magpie - an AM-FSK file transmitter in the 1500khzrange\n\n Uses PWM of square waves to generate AM-AFSK transmission of a file \n\nbased on SBR by William Entriken:https://github.com/fulldecent\n\n");
-            char uc[] = "  -l|loops [int] \t loops sets the number of times the data is transmitted. \n  -f [filename] \t the file specified in filename is read and transmitted\n";
+            fprintf(stderr, "usage: %s [-m|a|h] [-l loops] -f fname\n",argv[0]);
+            fprintf(stderr, "magpie - an AM-FSK file transmitter in the 1500khzrange\n\n Uses PWM of square waves to generate AM-FSK transmission of a file \n\nbased on SBR by William Entriken:https://github.com/fulldecent\n\n");
+            fprintf(stderr," Required:\n");
+            fprintf(stderr,"  -f [filename] \t the file specified in filename is read and transmitted\n");
+            fprintf(stderr,"\n Optional:\n");
+            char uc[] = "  -l [int] \t\t loops sets the number of times the data is transmitted. \n";
             fprintf(stderr,"%s",uc);
-            char uc2[] = "  -m\t\t\t uses (3)FSK repeat per bit with a FC/FC+300hz/FC+450hz encoding\n  -a\t\t\t uses AFSK encoding (0=1200hz, 1=2200hz)\n\n";
+            char uc2[] = "  -m\t\t\t uses 8FSK encoding.\n  -a \t\t\t uses AFSK encoding (0=1200hz, 1=2200hz) (Default)\n\n";
             fprintf(stderr,"%s",uc2);
 }
 
@@ -103,25 +106,25 @@ static inline void mfsknib(char nib, int time_ms){
         int freq=0;
         switch(nib){
         case 0:
-        freq=200;
-        break;
-        case 1:
         freq=200*2;
         break;
-        case 2:
+        case 1:
         freq=200*3;
         break;
-        case 3:
+        case 2:
         freq=200*5;
         break;
-        case 4:
+        case 3:
         freq=200*7;
         break;
-        case 5:
+        case 4:
         freq=200*11;
         break;
-        case 6:
+        case 5:
         freq=200*13;
+        break;
+        case 6:
+        freq=200*17;
         break;
         case 7:
         freq=200*19;
@@ -152,9 +155,7 @@ fclose(fileptr); // Close the file
 char bitnow=0;
 
 int time_ms=200;
-//int freq_hz;
 
-//int i,b;
 for ( int j = 0; j < loops; j ++){
 for ( int i = 0; i < filelen + 1; i++) {
     char mb_0=0;
@@ -165,16 +166,16 @@ for ( int i = 0; i < filelen + 1; i++) {
     bitnow = (buffer[i] & ( 1 << b )) >> b ;
     
     if (enc == 1){
-            afskbit(bitnow, time_ms); 
-            if( i  %  2 == 0 ){
-                //preamble every 16 bits
+        if( i  %  2 == 0 ){
+                //preamble (0110) every 16 bits
                 preamble();
             }
+        afskbit(bitnow, time_ms); 
     }
     else {
             //rolling 3 bit windows, used to determine 8FSK frequency.
             mb_2 = bitnow & 1;
-            char nib = makenib(mb_0, mb_1, mb_2);
+            char nib = makenib(mb_2, mb_1, mb_0);
             mfsknib(nib, time_ms);
             mb_0=mb_1 & 1;
             mb_1=mb_2 & 1;
@@ -236,7 +237,7 @@ main(int argc, char *argv[ ])
         errflg++;
     
     if (errflg) {
-        fprintf(stderr, "usage: %s [-m|a] [-l loops] -f fname\n",argv[0]);
+        fprintf(stderr, "usage: %s [-m|a|h] [-l loops] -f fname\n",argv[0]);
         exit(2);
     }
 //Setup below
