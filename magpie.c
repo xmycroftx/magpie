@@ -50,7 +50,6 @@ mach_port_t clock_port;
 mach_timespec_t remain;
 
 static inline void square_am_signal(float time, float frequency) {
-    //printf("Playing / %0.3f seconds / %4.0f Hz\n", time, frequency);
     uint64_t period = NSEC_PER_SEC / frequency;
 
     uint64_t start = mach_absolute_time();
@@ -79,24 +78,28 @@ static inline void showhelp(char *argv[]){
             fprintf(stderr,"%s",uc2);
 }
 
-static inline void preamble(){
-fprintf(stdout, "\n0,1,1,0,");
+static inline void preamble(char pre){
+if(pre==1){
+fprintf(stderr, "\n 0  1  1  0 ");
 square_am_signal(1.0 * 200 /2 / 1000, 1200);
 square_am_signal(1.0 * 200 /2 / 1000, 2200);
 square_am_signal(1.0 * 200 /2 / 1000, 2200);
 square_am_signal(1.0 * 200 /2 / 1000, 1200);
+} else {
+fprintf(stderr, "\n");
+}
 return;
 }
 
 static inline void afskbit(char b, int time_ms){
     int freq_hz = 0;
     if(b == 1){
-        fprintf(stdout, "1,");
+        fprintf(stderr," 1 ");
         freq_hz = 1200;
         }
     else {
         freq_hz = 2200;
-        fprintf(stdout, "0,");
+        fprintf(stderr," 0 ");
         }
         square_am_signal(1.0 * time_ms / 1000, freq_hz);
 }
@@ -130,6 +133,7 @@ static inline void mfsknib(char nib, int time_ms){
         freq=200*19;
         break;
         }
+        fprintf(stderr, " %d hz", freq);
         square_am_signal(1.0 * time_ms /2 / 1000, freq);
 }
 
@@ -138,7 +142,7 @@ return (mb_0 + (mb_1 << 1) + (mb_2 << 2));
 
 }
 
-static inline void fileplayer(char *file, int loops, int enc){
+static inline void fileplayer(char *file, int loops, int enc, char pre){
 FILE *fileptr;
 char *buffer;
 long filelen;
@@ -157,19 +161,24 @@ char bitnow=0;
 int time_ms=200;
 
 for ( int j = 0; j < loops; j ++){
+int bc=0;
 for ( int i = 0; i < filelen + 1; i++) {
     char mb_0=0;
     char mb_1=0;
     char mb_2=0;
 
+    if( i  %  2 == 0 ){
+    if (enc == 1){
+                //preamble (0110) every 16 bits
+                preamble(pre);
+            }else {
+            fprintf(stderr,"\n");
+            }
+        }
     for ( int b =0; b < 7; b++) { 
     bitnow = (buffer[i] & ( 1 << b )) >> b ;
     
     if (enc == 1){
-        if( i  %  2 == 0 ){
-                //preamble (0110) every 16 bits
-                preamble();
-            }
         afskbit(bitnow, time_ms); 
     }
     else {
@@ -180,9 +189,11 @@ for ( int i = 0; i < filelen + 1; i++) {
             mb_0=mb_1 & 1;
             mb_1=mb_2 & 1;
         }
+
     }
 }
-fprintf(stdout, "\n");
+bc+=1;
+fprintf(stdout, "%d\n", bc);
 }
 }
 
@@ -191,7 +202,7 @@ int
 main(int argc, char *argv[ ])
 {
     int c;
-    int tflg=0, eflg=0, errflg = 0;
+    int tflg=0, eflg=0, pflg=0, errflg = 0;
     char *file = NULL;
     int loops=1;
     extern char *optarg;
@@ -219,7 +230,7 @@ main(int argc, char *argv[ ])
             break;
         case 'f':
             file = optarg;
-            break;
+           break;
         case 'l':
             loops = atoi(optarg);
             break;
@@ -246,20 +257,29 @@ main(int argc, char *argv[ ])
     mach_timebase_info_data_t theTimeBaseInfo;
     mach_timebase_info(&theTimeBaseInfo);
     puts("TESTING TIME BASE: the following should be 1 / 1");
-    printf("  Mach base: %u / %u nanoseconds\n\n", theTimeBaseInfo.numer, theTimeBaseInfo.denom);
+    printf("  Mach base: %u / %u nanoseconds\n", theTimeBaseInfo.numer, theTimeBaseInfo.denom);
 #endif
     uint64_t start = mach_absolute_time();
     uint64_t end = mach_absolute_time();
-    printf("TESTING TIME TO EXECUTE mach_absolute_time()\n  Result: %"PRIu64" nanoseconds\n\n", end - start);
+    printf("TESTING TIME TO EXECUTE mach_absolute_time()\n  Result: %"PRIu64" nanoseconds\n", end - start);
 
     reg_zero = _mm_set_epi32(0, 0, 0, 0);
     reg_one = _mm_set_epi32(-1, -1, -1, -1);
 
 int enc=1;
-if(tflg==1)
+if(tflg==1){
+    fprintf(stderr, "Encoding set to 8FSK.\n");
     enc=2;
-
+    }else {
+    fprintf(stderr, "Encoding set to AFSK.\n");
+    }
+char pre=0;
+if(pflg==1){
+    pre=1;
+    fprintf(stderr, "Preamble enabled.\n");
+    }else{
+    fprintf(stderr, "Preamble disabled.\n");
+    }
 // Setup Code goes ^^^
-
-fileplayer(file,loops,enc);
+fileplayer(file,loops,enc,pre);
 }
